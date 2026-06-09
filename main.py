@@ -8,7 +8,7 @@ def main() -> None:
         # input_video="video_output.mp4",
         # video_id="video-xyz",
         # mc_alias_path="local_s3/video-streams",
-        # crf=23,
+        # crf=30,          # VP9: 0-63 (lower = better), default ~31
     )
 
     print("=== HLS PACKAGING PIPELINE ===")

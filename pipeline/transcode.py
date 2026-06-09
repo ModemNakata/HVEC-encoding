@@ -28,15 +28,20 @@ def run(config: Config, profile: Profile, meta: VideoMeta) -> None:
     if config.crf is not None:
         cmd += ["-crf", str(config.crf)]
 
-    cmd += ["-preset", config.preset]
     cmd += ["-pix_fmt", config.pixel_format]
 
     if config.video_codec_tag:
         cmd += ["-vtag", config.video_codec_tag]
 
-    # x265-specific params
-    if config.video_codec == "libx265" and config.x265_params:
-        cmd += ["-x265-params", config.x265_params]
+    # libvpx / VP9 specifics
+    if config.video_codec == "libvpx-vp9":
+        cmd += ["-deadline", config.deadline]
+        cmd += ["-cpu-used", str(config.cpu_used)]
+    else:
+        cmd += ["-preset", config.preset]
+
+    if config.codec_params:
+        cmd += config.codec_params
 
     # Keyframes
     cmd += ["-g", str(config.hls.keyframe_interval)]
