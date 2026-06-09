@@ -5,18 +5,10 @@ from pipeline import deps, probe, workspace, transcode, manifest, upload
 
 def main() -> None:
     cfg = Config(
-        input_video="video_output.mp4",
-        video_id="video-xyz",
-        output_dir="my_processed_video",
-        mc_alias_path="local_s3/video-streams",
-        video_codec="libx265",
-        video_codec_tag="hvc1",
-        x265_params="keyint=60:min-keyint=60:scenecut=0",
-        preset="medium",
+        # input_video="video_output.mp4",
+        # video_id="video-xyz",
+        # mc_alias_path="local_s3/video-streams",
         # crf=23,
-        clean_local=True,
-        clean_remote=True,
-        upload=True,
     )
 
     print("=== HLS PACKAGING PIPELINE ===")
