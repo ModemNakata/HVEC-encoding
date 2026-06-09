@@ -39,7 +39,7 @@ class Config:
 
     # Paths
     output_dir: str = "my_processed_video"
-    mc_alias_path: str = "local_s3/video-streams2"
+    mc_alias_path: str = "local_s3/video-streams"
 
     # Codec
     video_codec: str = "libx265"
