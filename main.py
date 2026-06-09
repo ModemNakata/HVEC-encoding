@@ -21,6 +21,8 @@ Steps:
   8. Upload the entire staging directory to S3 via the mc client.
 """
 
+from pathlib import Path
+
 from config import Config, filter_profiles, build_fallback
 from pipeline import deps, probe, workspace, transcode, manifest, upload
 
@@ -64,7 +66,18 @@ def main() -> None:
     # ── 7. Generate master manifest ───────────────────────────────────────
     manifest.generate(cfg, profiles, actual_resolutions)
 
-    # ── 8. Upload to S3 ───────────────────────────────────────────────────
+    # ── 8. Print combined totals ──────────────────────────────────────────
+    all_segs = list(Path(cfg.output_dir).rglob("*"))
+    total_out = sum(f.stat().st_size for f in all_segs if f.is_file())
+    src = meta.source_size_bytes
+    diff = (total_out - src) / (1024 * 1024)
+    pct = (total_out - src) / src * 100 if src > 0 else 0
+    sign = "+" if diff >= 0 else ""
+    print(f"[main] combined output: {total_out / (1024*1024):.1f} MB"
+          f"  ({sign}{diff:.1f} MB, {sign}{pct:.1f}%)"
+          f"  across {len(profiles)} variant(s)")
+
+    # ── 9. Upload to S3 ───────────────────────────────────────────────────
     upload.run(cfg)
 
     print("\n=== PIPELINE COMPLETE ===")

@@ -33,16 +33,15 @@ class Config:
     output_dir: str = "my_processed_video"
     mc_alias_path: str = "local_s3/video-streams"
 
-    # ── Video codec: H.265 / HEVC ─────────────────────────────────────────────
-    # libx265 is the software HEVC encoder built into ffmpeg.
-    # Hardware decode is widely supported on modern Apple devices (Apple Silicon,
-    # iPhone 6+), Android TV, and most smart TVs from 2016+.
-    video_codec: str = "libx265"
+    # ── Video codec: H.264 ────────────────────────────────────────────────────
+    # libx264 is the software H.264 encoder built into ffmpeg.
+    # H.264 has the widest device and browser support of any codec.
+    video_codec: str = "libx264"
 
-    # hvc1 tag is required for Safari / QuickTime / iOS playback.
-    video_codec_tag: Optional[str] = "hvc1"
+    # avc1 tag is the standard H.264 identifier for Apple / browser playback.
+    video_codec_tag: Optional[str] = "avc1"
 
-    # libx265 internal parameters flushed as a colon-separated string.
+    # libx264 internal parameters flushed as a colon-separated string.
     # - keyint=60 / min-keyint=60 ensures a keyframe every ~2s (at 30fps)
     # - scenecut=0 prevents extra keyframes from scene changes (keeps segments uniform)
     codec_params: Optional[str] = "keyint=60:min-keyint=60:scenecut=0"
@@ -55,10 +54,10 @@ class Config:
     # ── Capped CRF rate control ───────────────────────────────────────────────
 
     # CRF (Constant Rate Factor): primary quality control, 0–51 (lower = better).
-    #   18 = visually lossless (our default — best quality)
-    #   23 = good quality / typical default
+    #   18 = visually lossless
+    #   23 = good quality (typical default for H.264)
     #   28 = smaller file, visible quality loss
-    crf: int = 18
+    crf: int = 23
 
     # maxrate caps the peak bitrate so the output never inflates above the source.
     #   maxrate = min(profile.ceiling_kbps, source_bitrate_kbps * cap_scale)
@@ -77,16 +76,17 @@ class Config:
     hls: HlsConfig = field(default_factory=HlsConfig)
 
     # ── Quality ladder ────────────────────────────────────────────────────────
-    # HEVC achieves roughly 40-50% bitrate savings over H.264 at the same quality.
-    # These ceilings are generous — the source*cap_scale cap does the real limiting.
+    # H.264 ceilings are roughly 2× HEVC at the same resolution.
+    # The source*cap_scale cap still prevents inflation on low-bitrate uploads.
     profiles: List[Profile] = field(default_factory=lambda: [
-        Profile("1440p",  6000000, 2560, 1440,  6000),
-        Profile("1080p",  3500000, 1920, 1080,  3500),
-        Profile("720p",   1800000, 1280,  720,  1800),
+        Profile("1440p", 12000000, 2560, 1440, 12000),
+        Profile("1080p",  6000000, 1920, 1080,  6000),
+        Profile("720p",   3000000, 1280,  720,  3000),
+        Profile("480p",   1200000,  854,  480,  1200),
     ])
 
     fallback_profile: Profile = field(default_factory=lambda: Profile(
-        "source", 800000, 1920, 0, 800,
+        "source", 1600000, 1920, 0, 1600,
     ))
 
     # ── Behaviour flags ───────────────────────────────────────────────────────

@@ -34,17 +34,12 @@ All settings in `config.py`:
 
 ## Compatibility note
 
-HEVC (H.265) offers ~40–50% better compression than H.264 at equivalent
-quality, but is slightly less compatible:
+### Codec notes
 
-- **macOS / iOS** — fully supported (hardware decode on Apple Silicon +
-  iPhone 6+; requires `hvc1` tag which is set by default).
-- **Android** — supported from Android 5.0+, hardware on most devices.
-- **Windows** — supported via built-in HEVC extensions or third-party
-  players (VLC, mpv).
-- **Linux** — software decode via ffmpeg; hardware varies by GPU/driver.
-- **Smart TVs** — most 2016+ models support HEVC.
+**H.264** is the default — it has the widest browser/device support of any
+codec and works everywhere without additional plugins.
 
-If you need **maximum compatibility** (pre-2016 devices, feature phones,
-unusual browsers), switch to H.264 by changing `video_codec` and
-`video_codec_tag` in `config.py`.
+If you need better compression, switch to **HEVC (H.265)** in `config.py`
+(`video_codec = "libx265"`, `video_codec_tag = "hvc1"`). HEVC support is
+narrower on desktop — only Safari (macOS) and Edge (Windows) support it
+natively in browsers; Chrome and Firefox do not.

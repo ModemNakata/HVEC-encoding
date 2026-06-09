@@ -65,7 +65,19 @@ def run(config: Config, profile: Profile, meta: VideoMeta) -> str:
         sys.exit(1)
 
     segs = list(Path(config.output_dir).glob(f"{profile.name}_*.m4s"))
-    total_mb = sum(f.stat().st_size for f in segs) / (1024 * 1024)
-    print(f"[transcode] {profile.name}: {len(segs)} segments, {total_mb:.1f} MB total")
+    init = Path(config.output_dir) / f"{profile.name}_init.mp4"
+    total_bytes = sum(f.stat().st_size for f in segs)
+    if init.exists():
+        total_bytes += init.stat().st_size
+    total_mb = total_bytes / (1024 * 1024)
+
+    src = meta.source_size_bytes
+    reduction_bytes = src - total_bytes
+    reduction_pct = (reduction_bytes / src * 100) if src > 0 else 0
+    sign = "-" if reduction_bytes >= 0 else "+"
+
+    print(f"[transcode] {profile.name}: {len(segs)} segments, {total_mb:.1f} MB"
+          f"  ({sign}{abs(reduction_bytes) / (1024*1024):.1f} MB,"
+          f" {sign}{abs(reduction_pct):.1f}%)")
 
     return actual_res

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ class VideoMeta:
     duration_s: float
     audio_bitrate_bps: int = 0
     audio_codec: str = ""
+    source_size_bytes: int = 0
 
     @property
     def min_dim(self) -> int:
@@ -26,6 +28,10 @@ class VideoMeta:
     @property
     def is_portrait(self) -> bool:
         return self.height > self.width
+
+    @property
+    def source_size_mb(self) -> float:
+        return self.source_size_bytes / (1024 * 1024)
 
 
 def _probe_video(config: Config, data: dict) -> tuple:
@@ -94,14 +100,17 @@ def probe(config: Config) -> VideoMeta:
         sys.exit(1)
 
     audio_br, audio_codec = _probe_audio(config)
+    source_bytes = os.path.getsize(config.input_video)
 
     meta = VideoMeta(
         width=w, height=h, bitrate_bps=br, codec=codec,
         fps=fps, duration_s=dur,
         audio_bitrate_bps=audio_br, audio_codec=audio_codec,
+        source_size_bytes=source_bytes,
     )
     print(f"[probe] {meta.width}x{meta.height} ({meta.min_dim}p)  {meta.codec}"
           f"  {meta.bitrate_bps // 1000} kbps  {meta.fps:.2f} fps"
           f"  {meta.duration_s:.1f}s"
-          f"  audio: {meta.audio_codec} {meta.audio_bitrate_bps // 1000}k")
+          f"  audio: {meta.audio_codec} {meta.audio_bitrate_bps // 1000}k"
+          f"  source: {meta.source_size_mb:.1f} MB")
     return meta
