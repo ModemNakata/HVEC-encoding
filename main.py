@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from config import Config, filter_profiles, build_fallback
+from config import Config, filter_profiles, build_fallback, build_scale
 from pipeline import deps, probe, workspace, transcode, manifest, upload
 
 
@@ -8,29 +8,30 @@ def main() -> None:
         # input_video="video_output.mp4",
         # video_id="video-xyz",
         # mc_alias_path="local_s3/video-streams",
-        # crf=30,          # VP9: 0-63 (lower = better), default ~31
     )
 
     print("=== HLS PACKAGING PIPELINE ===")
 
     deps.check(cfg)
-
     meta = probe.probe(cfg)
 
     workspace.clean_local(cfg)
     if cfg.clean_remote:
         workspace.clean_remote(cfg)
 
-    profiles = filter_profiles(cfg.profiles, meta.height)
+    # Use the short edge for profile matching (handles portrait/landscape)
+    profiles = filter_profiles(cfg.profiles, meta.min_dim)
     if not profiles:
-        profiles = [build_fallback(meta.height, cfg.fallback_profile)]
+        profiles = [build_fallback(meta.min_dim, cfg.fallback_profile)]
 
     print(f"[main] active profiles: {[p.name for p in profiles]}")
 
+    actual_resolutions: dict[str, str] = {}
     for p in profiles:
-        transcode.run(cfg, p, meta)
+        actual_res = transcode.run(cfg, p, meta)
+        actual_resolutions[p.name] = actual_res
 
-    manifest.generate(cfg, profiles)
+    manifest.generate(cfg, profiles, actual_resolutions)
     upload.run(cfg)
 
     print("=== PIPELINE COMPLETE ===")

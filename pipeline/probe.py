@@ -17,6 +17,14 @@ class VideoMeta:
     fps: float
     duration_s: float
 
+    @property
+    def min_dim(self) -> int:
+        return min(self.width, self.height)
+
+    @property
+    def is_portrait(self) -> bool:
+        return self.height > self.width
+
 
 def probe(config: Config) -> VideoMeta:
     cmd = [
@@ -55,7 +63,7 @@ def probe(config: Config) -> VideoMeta:
         sys.exit(1)
 
     meta = VideoMeta(width=w, height=h, bitrate_bps=br, codec=codec, fps=fps, duration_s=dur)
-    print(f"[probe] {meta.width}x{meta.height} ({meta.height}p)  {meta.codec}"
+    print(f"[probe] {meta.width}x{meta.height} ({meta.min_dim}p)  {meta.codec}"
           f"  {meta.bitrate_bps // 1000} kbps  {meta.fps:.2f} fps"
           f"  {meta.duration_s:.1f}s")
     return meta
