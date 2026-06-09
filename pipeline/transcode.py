@@ -47,10 +47,8 @@ def run(config: Config, profile: Profile, meta: VideoMeta) -> str:
     cmd += ["-g", str(config.hls.keyframe_interval)]
     cmd += ["-sc_threshold", "0"]
 
-    if config.copy_audio:
-        cmd += ["-c:a", "copy"]
-    else:
-        cmd += ["-c:a", config.audio.codec, "-b:a", config.audio.bitrate]
+    ab_kbps = max(64, meta.audio_bitrate_bps // 1000) if meta.audio_bitrate_bps else 128
+    cmd += ["-c:a", "aac", "-b:a", f"{ab_kbps}k"]
 
     cmd += ["-hls_time", str(config.hls.segment_duration)]
     cmd += ["-hls_playlist_type", config.hls.playlist_type]

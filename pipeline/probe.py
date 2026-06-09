@@ -16,6 +16,8 @@ class VideoMeta:
     codec: str
     fps: float
     duration_s: float
+    audio_bitrate_bps: int = 0
+    audio_codec: str = ""
 
     @property
     def min_dim(self) -> int:
@@ -24,6 +26,49 @@ class VideoMeta:
     @property
     def is_portrait(self) -> bool:
         return self.height > self.width
+
+
+def _probe_video(config: Config, data: dict) -> tuple:
+    s = data["streams"][0]
+    fmt = data["format"]
+
+    w = int(s["width"])
+    h = int(s["height"])
+    codec = s.get("codec_name", "unknown")
+
+    num, den = str(s.get("r_frame_rate", "30/1")).split("/")
+    fps = int(num) / int(den)
+
+    br = s.get("bit_rate") or fmt.get("bit_rate", "0")
+    br = int(br) if br not in ("N/A", "0") else 0
+
+    dur = float(fmt.get("duration", 0))
+    return w, h, codec, fps, br, dur
+
+
+def _probe_audio(config: Config) -> tuple:
+    cmd = [
+        "ffprobe", "-v", "error",
+        "-select_streams", "a:0",
+        "-show_entries", "stream=bit_rate,codec_name",
+        "-of", "json",
+        config.input_video,
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        return 0, ""
+
+    try:
+        data = json.loads(proc.stdout)
+        if not data.get("streams"):
+            return 0, ""
+        s = data["streams"][0]
+        br = s.get("bit_rate", "0")
+        br = int(br) if br not in ("N/A", "0") else 0
+        codec = s.get("codec_name", "")
+        return br, codec
+    except (KeyError, IndexError, ValueError):
+        return 0, ""
 
 
 def probe(config: Config) -> VideoMeta:
@@ -43,27 +88,20 @@ def probe(config: Config) -> VideoMeta:
 
     try:
         data = json.loads(proc.stdout)
-        s = data["streams"][0]
-        fmt = data["format"]
-
-        w = int(s["width"])
-        h = int(s["height"])
-        codec = s.get("codec_name", "unknown")
-
-        num, den = str(s.get("r_frame_rate", "30/1")).split("/")
-        fps = int(num) / int(den)
-
-        br = s.get("bit_rate") or fmt.get("bit_rate", "0")
-        br = int(br) if br not in ("N/A", "0") else 0
-
-        dur = float(fmt.get("duration", 0))
-
+        w, h, codec, fps, br, dur = _probe_video(config, data)
     except (KeyError, IndexError, ValueError) as e:
         print(f"[probe] failed to parse ffprobe output: {e}")
         sys.exit(1)
 
-    meta = VideoMeta(width=w, height=h, bitrate_bps=br, codec=codec, fps=fps, duration_s=dur)
+    audio_br, audio_codec = _probe_audio(config)
+
+    meta = VideoMeta(
+        width=w, height=h, bitrate_bps=br, codec=codec,
+        fps=fps, duration_s=dur,
+        audio_bitrate_bps=audio_br, audio_codec=audio_codec,
+    )
     print(f"[probe] {meta.width}x{meta.height} ({meta.min_dim}p)  {meta.codec}"
           f"  {meta.bitrate_bps // 1000} kbps  {meta.fps:.2f} fps"
-          f"  {meta.duration_s:.1f}s")
+          f"  {meta.duration_s:.1f}s"
+          f"  audio: {meta.audio_codec} {meta.audio_bitrate_bps // 1000}k")
     return meta

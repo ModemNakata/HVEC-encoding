@@ -15,12 +15,6 @@ class Profile:
 
 
 @dataclass
-class AudioConfig:
-    codec: str = "aac"
-    bitrate: str = "128k"
-
-
-@dataclass
 class HlsConfig:
     segment_duration: int = 4
     segment_type: str = "fmp4"
@@ -59,10 +53,6 @@ class Config:
     buf_factor: float = 1.5
 
     pixel_format: str = "yuv420p"
-
-    # ── Audio ─────────────────────────────────────────────────────────────────
-    copy_audio: bool = True
-    audio: AudioConfig = field(default_factory=AudioConfig)
 
     # ── HLS ───────────────────────────────────────────────────────────────────
     hls: HlsConfig = field(default_factory=HlsConfig)

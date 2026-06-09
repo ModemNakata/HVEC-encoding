@@ -4,11 +4,7 @@ from pipeline import deps, probe, workspace, transcode, manifest, upload
 
 
 def main() -> None:
-    cfg = Config(
-        # input_video="video_output.mp4",
-        # video_id="video-xyz",
-        # mc_alias_path="local_s3/video-streams",
-    )
+    cfg = Config()
 
     print("=== HLS PACKAGING PIPELINE ===")
 
