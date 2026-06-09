@@ -41,8 +41,8 @@ def run(config: Config, profile: Profile, meta: VideoMeta) -> str:
     if config.codec_params:
         if config.video_codec == "libx265":
             cmd += ["-x265-params", config.codec_params]
-        else:
-            cmd += ["-params", config.codec_params]
+        elif config.video_codec == "libx264":
+            cmd += ["-x264-params", config.codec_params]
 
     cmd += ["-g", str(config.hls.keyframe_interval)]
     cmd += ["-sc_threshold", "0"]

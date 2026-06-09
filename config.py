@@ -33,39 +33,60 @@ class Config:
     output_dir: str = "my_processed_video"
     mc_alias_path: str = "local_s3/video-streams"
 
-    # ── Video codec ───────────────────────────────────────────────────────────
+    # ── Video codec: H.265 / HEVC ─────────────────────────────────────────────
+    # libx265 is the software HEVC encoder built into ffmpeg.
+    # Hardware decode is widely supported on modern Apple devices (Apple Silicon,
+    # iPhone 6+), Android TV, and most smart TVs from 2016+.
     video_codec: str = "libx265"
+
+    # hvc1 tag is required for Safari / QuickTime / iOS playback.
     video_codec_tag: Optional[str] = "hvc1"
 
-    # Encoder params (e.g. "keyint=60:min-keyint=60:scenecut=0" for libx265)
-    codec_params: Optional[str] = None
+    # libx265 internal parameters flushed as a colon-separated string.
+    # - keyint=60 / min-keyint=60 ensures a keyframe every ~2s (at 30fps)
+    # - scenecut=0 prevents extra keyframes from scene changes (keeps segments uniform)
+    codec_params: Optional[str] = "keyint=60:min-keyint=60:scenecut=0"
 
-    # x264/x265: ultrafast … placebo
-    preset: str = "medium"
+    # Speed-vs-compression trade-off. Slower = better compression = smaller file.
+    # ultrafast > superfast > veryfast > faster > fast >
+    # medium > slow > slower > veryslow > placebo
+    preset: str = "slow"
 
     # ── Capped CRF rate control ───────────────────────────────────────────────
 
-    # CRF: 0–51 (lower = better). ~23 = good, ~28 = default.
-    crf: int = 23
-    # maxrate = min(profile.ceiling_kbps, source_kbps * cap_scale)
-    cap_scale: float = 0.8
-    # bufsize = int(maxrate * buf_factor)
-    buf_factor: float = 1.5
+    # CRF (Constant Rate Factor): primary quality control, 0–51 (lower = better).
+    #   18 = visually lossless (our default — best quality)
+    #   23 = good quality / typical default
+    #   28 = smaller file, visible quality loss
+    crf: int = 18
 
+    # maxrate caps the peak bitrate so the output never inflates above the source.
+    #   maxrate = min(profile.ceiling_kbps, source_bitrate_kbps * cap_scale)
+    #   cap_scale=0.9 means we allow up to 90% of the source's bitrate.
+    #   If the source is 2000kbps, maxrate caps at 1800k (10% reduction minimum).
+    cap_scale: float = 0.9
+
+    # bufsize = maxrate * buf_factor — the VBV buffer window for the rate controller.
+    # A factor of 2× gives the encoder enough room to handle complex scenes smoothly.
+    buf_factor: float = 2
+
+    # 8-bit 4:2:0 — safest pixel format for browser/device compatibility.
     pixel_format: str = "yuv420p"
 
     # ── HLS ───────────────────────────────────────────────────────────────────
     hls: HlsConfig = field(default_factory=HlsConfig)
 
     # ── Quality ladder ────────────────────────────────────────────────────────
+    # HEVC achieves roughly 40-50% bitrate savings over H.264 at the same quality.
+    # These ceilings are generous — the source*cap_scale cap does the real limiting.
     profiles: List[Profile] = field(default_factory=lambda: [
-        Profile("1440p", 6000000, 2560, 1440, 6000),
-        Profile("1080p", 3000000, 1920, 1080, 3000),
-        Profile("720p",  1500000, 1280,  720, 1500),
+        Profile("1440p",  6000000, 2560, 1440,  6000),
+        Profile("1080p",  3500000, 1920, 1080,  3500),
+        Profile("720p",   1800000, 1280,  720,  1800),
     ])
 
     fallback_profile: Profile = field(default_factory=lambda: Profile(
-        "source", 600000, 1920, 0, 600,
+        "source", 800000, 1920, 0, 800,
     ))
 
     # ── Behaviour flags ───────────────────────────────────────────────────────
@@ -100,12 +121,14 @@ def calc_bufsize(maxrate_kbps: int, buf_factor: float) -> int:
 
 
 def build_scale(profile: Profile, src_w: int, src_h: int) -> Tuple[str, str]:
-    """Return (scale_filter, actual_resolution) for the given source."""
+    """Return (ffmpeg scale filter, actual output resolution) for the given source."""
     if src_w >= src_h:
+        # Landscape: fix width to ref_width, compute height proportionally
         w = profile.ref_width
         h = int(w * src_h / src_w / 2) * 2
         return f"scale={w}:-2", f"{w}x{h}"
     else:
+        # Portrait: fix height to ref_width, compute width proportionally
         h = profile.ref_width
         w = int(h * src_w / src_h / 2) * 2
         return f"scale=-2:{h}", f"{w}x{h}"

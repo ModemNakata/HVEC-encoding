@@ -1,31 +1,50 @@
 # HVEC-encoding
 
-HLS video packaging pipeline that transcodes source videos into adaptive-bitrate HLS streams and uploads them to S3-compatible storage.
+HLS video packaging pipeline that transcodes source videos into adaptive-bitrate HLS streams using HEVC (H.265) and uploads them to S3-compatible storage.
 
 ## Requirements
 
-- **ffmpeg** — video/audio transcoding and HLS packaging
-- **ffprobe** — source video metadata analysis
-- **mc** (MinIO Client) — upload to S3-compatible storage
+- **ffmpeg** (with `libx265` support)
+- **ffprobe**
+- **mc** (MinIO Client)
 
-## Overview
+## Pipeline
 
-The pipeline inspects the input video with `ffprobe`, builds an adaptive resolution/bitrate ladder (e.g. 1080p, 720p, 480p), transcodees each variant into HLS segments (fMP4 or TS) via `ffmpeg`, generates a `master.m3u8` manifest, and uploads everything to a configurable S3 bucket path using `mc`.
+1. Probe source video metadata (resolution, bitrate, FPS, audio)
+2. Build an adaptive ladder filtered by source height: 1440p / 1080p / 720p
+3. Transcode each rung with capped-CRF rate control
+4. Generate `master.m3u8` manifest
+5. Upload to S3 via `mc`
 
-## Status
+Rate control guarantees output never inflates past the source:
+`maxrate = min(profile_ceiling, source_bitrate * 0.9)`
 
-This repository contains experimental scripts exploring different encoding strategies:
+Audio is re-encoded to AAC at the source bitrate (fallback 128k).
 
-| Script | Codec | Bitrate Strategy | Segment Format |
-|--------|-------|-----------------|----------------|
-| `process_video.py` | H.264 | Fixed CBR | TS |
-| `process_video2.py` | H.264 | Source-capped CBR | TS |
-| `hevc.py` | H.265 | Fixed CBR | fMP4 |
-| `hevc2.py` | H.265 | Source-adaptive CBR | fMP4 |
-| `hevc2_2.py` | H.265 | Source-adaptive CBR (S3 purge) | fMP4 |
-| `qwen-h265.py` | H.265 | CRF + capped maxrate | fMP4 |
-| `qwen2.py` | H.265 | CRF + dynamic maxrate | fMP4 |
-| `av1.py` | AV1 (SVT) | Fixed CBR | fMP4 |
-| `av1-ds.py` | AV1 (SVT) | Pixel-ratio source-adaptive | fMP4 |
+## Configuration
 
-All scripts share the same basic pipeline structure. Future work will consolidate these into a single configurable tool with an automated testing/benchmarking framework to compare codec/preset/bitrate trade-offs.
+All settings in `config.py`:
+- **`video_codec`** / **`video_codec_tag`** — codec and Apple compat tag
+- **`crf`** — quality (0–51, lower = better, default 18)
+- **`preset`** — speed/compression trade-off (default `slow`)
+- **`cap_scale`** — maxrate ceiling as fraction of source bitrate
+- **`buf_factor`** — VBV buffer multiplier
+- **`profiles`** — resolution ladder with per-rung bitrate ceilings
+- **`clean_local`** / **`clean_remote`** / **`upload`** — behaviour flags
+
+## Compatibility note
+
+HEVC (H.265) offers ~40–50% better compression than H.264 at equivalent
+quality, but is slightly less compatible:
+
+- **macOS / iOS** — fully supported (hardware decode on Apple Silicon +
+  iPhone 6+; requires `hvc1` tag which is set by default).
+- **Android** — supported from Android 5.0+, hardware on most devices.
+- **Windows** — supported via built-in HEVC extensions or third-party
+  players (VLC, mpv).
+- **Linux** — software decode via ffmpeg; hardware varies by GPU/driver.
+- **Smart TVs** — most 2016+ models support HEVC.
+
+If you need **maximum compatibility** (pre-2016 devices, feature phones,
+unusual browsers), switch to H.264 by changing `video_codec` and
+`video_codec_tag` in `config.py`.
